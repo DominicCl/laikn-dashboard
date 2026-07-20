@@ -62,4 +62,4 @@ group :test do
   gem "selenium-webdriver"
 end
 
-gem "google-cloud-firestore", "~> 2.15"
+gem "google-cloud-firestore", "~> 3.2"
