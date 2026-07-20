@@ -1,0 +1,288 @@
+<% 
+  # Build a structured array for the chart to group data by month
+  chart_data = @requests.to_a.reverse.map do |req|
+    time = req.data[:timestamp].to_time
+    {
+      month_key: time.strftime("%B %Y"), 
+      label: time.strftime("%m/%d %H:%M"), 
+      value: req.data[:carbon_intensity].to_i
+    }
+  end
+%>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; padding: 40px; background-color: #f4f6f8; min-height: 100vh;">
+  
+  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 40px;">
+    <%= image_tag "FinalLogo.png", height: 80, alt: "Laikn Logo", style: "display: block;" %>
+    <div style="display: flex; gap: 10px; align-items: center;">
+      <span style="background: #04703C; color: white; padding: 6px 15px; border-radius: 20px; font-weight: bold; font-size: 12px; letter-spacing: 0.5px;">SYSTEM ONLINE</span>
+    </div>
+  </div>
+
+  <div style="display: flex; gap: 20px; margin-bottom: 30px; flex-wrap: wrap;">
+    
+    <div style="background: white; padding: 30px; border-radius: 16px; box-shadow: 0 4px 20px rgba(0,0,0,0.05); flex: 1; min-width: 250px;">
+      <h3 style="margin: 0; color: #95a5a6; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px;">Total Carbon Saved</h3>
+      <div style="font-size: 56px; font-weight: 800; color: #04703C; margin-top: 10px; line-height: 1;">
+        <%= @total_saved %>g
+      </div>
+      <div style="height: 20px; margin-top: 12px;">
+        <p id="fun-fact-text" style="color: #bdc3c7; font-size: 14px; margin: 0; transition: opacity 0.5s ease-in-out; opacity: 1;">
+          Equivalent to charging <strong><%= (@total_saved / 5.0).to_i %></strong> smartphones 📱
+        </p>
+      </div>
+    </div>
+
+    <div style="background: white; padding: 30px; border-radius: 16px; box-shadow: 0 4px 20px rgba(0,0,0,0.05); flex: 1; min-width: 250px;">
+      <h3 style="margin: 0; color: #95a5a6; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px;">Latest Optimization</h3>
+      <div style="font-size: 32px; font-weight: 800; color: #2c3e50; margin-top: 15px;">
+        
+        <% r = @requests.first ? @requests.first.data[:region] : "Waiting..." %>
+        <%= r %> 
+
+      </div>
+      <p style="color: #7f8c8d; font-size: 14px; margin-bottom: 0; margin-top: 5px;">
+        Routed for lowest marginal emissions
+      </p>
+    </div>
+
+  </div>
+
+  <div style="background: white; padding: 25px; border-radius: 16px; box-shadow: 0 4px 20px rgba(0,0,0,0.05); margin-bottom: 30px;">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+      <h3 style="margin: 0; color: #2c3e50; font-size: 16px;">📉 Real-Time Carbon Intensity (g/kWh)</h3>
+      
+      <div style="display: flex; gap: 10px; align-items: center;">
+        <button id="prev-month-btn" style="background: #ecf0f1; border: none; padding: 6px 15px; border-radius: 15px; cursor: pointer; font-weight: bold; color: #2c3e50; transition: opacity 0.2s;">← Prev</button>
+        <span id="current-month-label" style="font-weight: bold; color: #04703C; padding: 0 10px; min-width: 120px; text-align: center;">Loading...</span>
+        <button id="next-month-btn" style="background: #ecf0f1; border: none; padding: 6px 15px; border-radius: 15px; cursor: pointer; font-weight: bold; color: #2c3e50; transition: opacity 0.2s;">Next →</button>
+      </div>
+
+    </div>
+    <div style="height: 300px; width: 100%;">
+      <canvas id="carbonChart"></canvas>
+    </div>
+  </div>
+
+  <div style="background: white; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.05);">
+    <table style="width: 100%; border-collapse: collapse; text-align: left;">
+      <thead style="background-color: #f8f9fa; border-bottom: 2px solid #ecf0f1;">
+        <tr>
+          <th style="padding: 18px 25px; color: #7f8c8d; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px;">Time</th>
+          <th style="padding: 18px 25px; color: #7f8c8d; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px;">Winner Region</th>
+          <th style="padding: 18px 25px; color: #7f8c8d; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px;">Grid Intensity (g/kWh)</th>
+          <th style="padding: 18px 25px; color: #7f8c8d; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px;">Carbon Saved</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% @requests.each_with_index do |req, index| %>
+          <% data = req.data %>
+          <tr class="history-row" style="border-bottom: 1px solid #f1f2f6; transition: background 0.2s; <%= 'display: none;' if index >= 10 %>">
+            
+            <td style="padding: 18px 25px; color: #2c3e50; font-weight: 500; font-size: 14px;">
+              <%= data[:timestamp].to_time.strftime("%m/%d/%y %H:%M:%S") %>
+            </td>
+            
+            <td style="padding: 18px 25px; font-weight: 600; color: #34495e;">
+              <%= data[:region] %> 
+            </td>
+
+            <td style="padding: 18px 25px;">
+              <% intensity = data[:carbon_intensity].to_i %>
+              <span style="padding: 6px 12px; border-radius: 20px; font-weight: 700; font-size: 12px; 
+                background: <%= intensity < 200 ? '#eafaf1' : (intensity < 500 ? '#fef9e7' : '#fdedec') %>; 
+                color: <%= intensity < 200 ? '#04703C' : (intensity < 500 ? '#f1c40f' : '#c0392b') %>;">
+                <%= intensity %>g
+              </span>
+            </td>
+            <td style="padding: 18px 25px; color: #04703C; font-weight: 700;">
+              +<%= data[:co2_saved] %>g
+            </td>
+          </tr>
+        <% end %>
+      </tbody>
+    </table>
+    
+    <% if @requests.to_a.size > 10 %>
+      <div id="view-more-container" style="display: flex; justify-content: center; gap: 15px; padding: 20px; background-color: #f8f9fa; border-top: 1px solid #ecf0f1;">
+        
+        <button id="view-less-btn" style="background-color: #95a5a6; color: white; border: none; padding: 10px 24px; border-radius: 20px; font-weight: bold; font-size: 14px; cursor: pointer; display: none;">
+          ↑ View Less
+        </button>
+
+        <button id="view-more-btn" style="background-color: #04703C; color: white; border: none; padding: 10px 24px; border-radius: 20px; font-weight: bold; font-size: 14px; cursor: pointer;">
+          View More ↓
+        </button>
+
+      </div>
+    <% end %>      
+  </div>
+</div>
+
+<script>
+  // --- CHART LOGIC WITH MONTHLY PAGINATION ---
+  const allChartData = <%= raw chart_data.to_json %>;
+  const uniqueMonths = [...new Set(allChartData.map(d => d.month_key))];
+  let currentMonthIndex = uniqueMonths.length - 1; 
+  
+  const ctx = document.getElementById('carbonChart').getContext('2d');
+  const carbonChart = new Chart(ctx, {
+      type: 'line',
+      data: { labels: [], datasets: [{
+              label: 'Grid Carbon Intensity',
+              data: [], 
+              borderColor: '#04703C',
+              backgroundColor: 'rgba(4, 112, 60, 0.05)',
+              borderWidth: 3,
+              pointBackgroundColor: '#fff',
+              pointBorderColor: '#04703C',
+              pointRadius: 5,
+              pointHoverRadius: 7,
+              fill: true,
+              tension: 0.4 
+          }]
+      },
+      options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { 
+            legend: { display: false },
+            tooltip: { backgroundColor: '#2c3e50', padding: 12, cornerRadius: 8, displayColors: false }
+          },
+          scales: {
+              y: { beginAtZero: true, grid: { color: '#f0f0f0', borderDash: [5, 5] } },
+              x: { grid: { display: false } }
+          }
+      }
+  });
+
+  function renderChartForMonth(index) {
+    if (uniqueMonths.length === 0) {
+      document.getElementById('current-month-label').innerText = "No Data";
+      return;
+    }
+    
+    const targetMonth = uniqueMonths[index];
+    document.getElementById('current-month-label').innerText = targetMonth;
+    
+    const filteredData = allChartData.filter(d => d.month_key === targetMonth);
+    
+    carbonChart.data.labels = filteredData.map(d => d.label);
+    carbonChart.data.datasets[0].data = filteredData.map(d => d.value);
+    carbonChart.update();
+
+    const prevBtn = document.getElementById('prev-month-btn');
+    const nextBtn = document.getElementById('next-month-btn');
+    
+    prevBtn.disabled = (index === 0);
+    prevBtn.style.opacity = (index === 0) ? '0.3' : '1';
+    prevBtn.style.cursor = (index === 0) ? 'default' : 'pointer';
+
+    nextBtn.disabled = (index === uniqueMonths.length - 1);
+    nextBtn.style.opacity = (index === uniqueMonths.length - 1) ? '0.3' : '1';
+    nextBtn.style.cursor = (index === uniqueMonths.length - 1) ? 'default' : 'pointer';
+  }
+
+  renderChartForMonth(currentMonthIndex);
+
+  document.getElementById('prev-month-btn')?.addEventListener('click', () => {
+    if (currentMonthIndex > 0) renderChartForMonth(--currentMonthIndex);
+  });
+  
+  document.getElementById('next-month-btn')?.addEventListener('click', () => {
+    if (currentMonthIndex < uniqueMonths.length - 1) renderChartForMonth(++currentMonthIndex);
+  });
+</script>
+
+<script>
+  // --- TABLE PAGINATION LOGIC ---
+  document.addEventListener("DOMContentLoaded", function() {
+      let visibleCount = 10;
+      const rows = document.querySelectorAll('.history-row');
+      const totalRows = rows.length;
+      
+      const viewMoreBtn = document.getElementById('view-more-btn');
+      const viewLessBtn = document.getElementById('view-less-btn');
+
+      function updateButtons() {
+        if (!viewMoreBtn || !viewLessBtn) return;
+        viewMoreBtn.style.display = (visibleCount >= totalRows) ? 'none' : 'inline-block';
+        viewLessBtn.style.display = (visibleCount <= 10) ? 'none' : 'inline-block';
+      }
+
+      if (viewMoreBtn) {
+        viewMoreBtn.addEventListener('click', function() {
+          let nextCount = Math.min(visibleCount + 10, totalRows);
+          
+          for (let i = visibleCount; i < nextCount; i++) {
+            rows[i].style.display = 'table-row';
+          }
+          visibleCount = nextCount;
+          updateButtons();
+        });
+      }
+
+      if (viewLessBtn) {
+        viewLessBtn.addEventListener('click', function() {
+          let remainder = visibleCount % 10;
+          let nextCount;
+
+          if (remainder !== 0) {
+            nextCount = visibleCount - remainder; 
+          } else {
+            nextCount = visibleCount - 10;
+          }
+
+          if (nextCount < 10) nextCount = 10; 
+
+          for (let i = nextCount; i < visibleCount; i++) {
+            rows[i].style.display = 'none';
+          }
+          
+          visibleCount = nextCount;
+          updateButtons();
+        });
+      }
+      
+      updateButtons();
+  });
+</script>
+
+<script>
+  // --- NEW: FUN FACT ROTATOR ---
+  document.addEventListener("DOMContentLoaded", function() {
+    const factElement = document.getElementById("fun-fact-text");
+    const totalGrams = <%= @total_saved || 0 %>;
+
+    // The math behind the stats:
+    // 1 Smartphone = ~5g CO2
+    // 1 Mature tree = ~60g CO2 absorbed per day
+    // 1 Average car = ~400g CO2 per mile
+    // 1 Plastic bag = ~33g CO2 to produce
+    const facts = [
+      `Equivalent to charging <strong>${Math.floor(totalGrams / 5.0)}</strong> smartphones 📱`,
+      `Equivalent to a mature tree absorbing carbon for <strong>${(totalGrams / 60.0).toFixed(1)}</strong> days 🌳`,
+      `Offset the production of <strong>${Math.floor(totalGrams / 33.0)}</strong> plastic bags 🛍️`,
+      `Saved the emissions of driving a gas car <strong>${(totalGrams / 400.0).toFixed(2)}</strong> miles 🚗`
+    ];
+
+    let currentIndex = 0;
+
+    // Run this block every 30 seconds (30000ms)
+    setInterval(() => {
+      // 1. Fade out
+      factElement.style.opacity = 0;
+      
+      // 2. Wait 500ms for the fade to finish, then swap the text and fade back in
+      setTimeout(() => {
+        currentIndex = (currentIndex + 1) % facts.length;
+        // THE FIX: Changed currentFactIndex to currentIndex
+        factElement.innerHTML = facts[currentIndex];
+        factElement.style.opacity = 1;
+      }, 500);
+
+    }, 30000); 
+  });
+</script>
