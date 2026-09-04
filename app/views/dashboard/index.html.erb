@@ -1,128 +1,150 @@
 <% 
-  # Build a structured array for the chart to group data by month
-  chart_data = @requests.to_a.reverse.map do |req|
-    time = req.data[:timestamp].to_time
-    {
-      month_key: time.strftime("%B %Y"), 
-      label: time.strftime("%m/%d %H:%M"), 
-      value: req.data[:carbon_intensity].to_i
-    }
+  # Chart Data Builder (Sorted chronologically: Oldest -> Newest)
+  chart_data = []
+  if @requests.present?
+    sorted_history = @requests.to_a.sort_by { |req| req.data[:timestamp].to_time }
+    
+    chart_data = sorted_history.map do |req|
+      time = req.data[:timestamp].to_time
+      { month_key: time.strftime("%B %Y"), label: time.strftime("%m/%d %H:%M"), value: req.data[:carbon_intensity].to_i }
+    end
   end
 %>
 
+<script src="https://cdn.tailwindcss.com"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
-<div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; padding: 40px; background-color: #f4f6f8; min-height: 100vh;">
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 font-sans bg-slate-50 min-h-screen">
   
-  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 40px;">
-    <%= image_tag "FinalLogo.png", height: 80, alt: "Laikn Logo", style: "display: block;" %>
-    <div style="display: flex; gap: 10px; align-items: center;">
-      <span style="background: #04703C; color: white; padding: 6px 15px; border-radius: 20px; font-weight: bold; font-size: 12px; letter-spacing: 0.5px;">SYSTEM ONLINE</span>
+  <!-- Header with Logo Only -->
+  <div class="flex justify-between items-center mb-10">
+    <div class="flex items-center gap-4">
+      <%= image_tag "FinalLogo.png", height: 60, class: "h-12 w-auto", alt: "Laikn Logo" %>
     </div>
+    <span class="bg-emerald-600 text-white px-4 py-1.5 rounded-full font-bold text-xs tracking-wider shadow-sm">
+      SYSTEM ONLINE
+    </span>
   </div>
 
-  <div style="display: flex; gap: 20px; margin-bottom: 30px; flex-wrap: wrap;">
+  <!-- HERO STATS ROW -->
+  <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
     
-    <div style="background: white; padding: 30px; border-radius: 16px; box-shadow: 0 4px 20px rgba(0,0,0,0.05); flex: 1; min-width: 250px;">
-      <h3 style="margin: 0; color: #95a5a6; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px;">Total Carbon Saved</h3>
-      <div style="font-size: 56px; font-weight: 800; color: #04703C; margin-top: 10px; line-height: 1;">
-        <%= @total_saved %>g
+    <!-- Total CO2 Saved & Fun Fact -->
+    <div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-6 flex flex-col justify-center">
+      <h3 class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">Total Carbon Saved</h3>
+      <div class="text-5xl font-extrabold text-emerald-700 leading-none mb-3">
+        <%= @total_saved || 0 %>g
       </div>
-      <div style="height: 20px; margin-top: 12px;">
-        <p id="fun-fact-text" style="color: #bdc3c7; font-size: 14px; margin: 0; transition: opacity 0.5s ease-in-out; opacity: 1;">
-          Equivalent to charging <strong><%= (@total_saved / 5.0).to_i %></strong> smartphones 📱
+      <div class="h-5">
+        <p id="fun-fact-text" class="text-sm text-slate-500 transition-opacity duration-500 opacity-100">
+          Equivalent to charging <strong><%= ((@total_saved || 0) / 5.0).to_i %></strong> smartphones 📱
         </p>
       </div>
     </div>
 
-    <div style="background: white; padding: 30px; border-radius: 16px; box-shadow: 0 4px 20px rgba(0,0,0,0.05); flex: 1; min-width: 250px;">
-      <h3 style="margin: 0; color: #95a5a6; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px;">Latest Optimization</h3>
-      <div style="font-size: 32px; font-weight: 800; color: #2c3e50; margin-top: 15px;">
-        
-        <% r = @requests.first ? @requests.first.data[:region] : "Waiting..." %>
-        <%= r %> 
-
+    <!-- Immediate Routes -->
+    <div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-6 flex items-center">
+      <div class="p-4 rounded-xl bg-blue-50 text-blue-600">
+        <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
       </div>
-      <p style="color: #7f8c8d; font-size: 14px; margin-bottom: 0; margin-top: 5px;">
-        Routed for lowest marginal emissions
-      </p>
+      <div class="ml-5">
+        <p class="text-xs font-bold text-slate-400 uppercase tracking-widest">Standard Routes</p>
+        <h3 class="text-3xl font-bold text-slate-900 mt-1"><%= @immediate_count || 0 %></h3>
+      </div>
     </div>
 
+    <!-- Eco-Patience (Shifted) -->
+    <div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-6 flex items-center">
+      <div class="p-4 rounded-xl bg-violet-50 text-violet-600">
+        <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+      </div>
+      <div class="ml-5">
+        <p class="text-xs font-bold text-slate-400 uppercase tracking-widest">Workloads Shifted</p>
+        <h3 class="text-3xl font-bold text-slate-900 mt-1"><%= @shifted_count || 0 %></h3>
+      </div>
+    </div>
   </div>
 
-  <div style="background: white; padding: 25px; border-radius: 16px; box-shadow: 0 4px 20px rgba(0,0,0,0.05); margin-bottom: 30px;">
-    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
-      <h3 style="margin: 0; color: #2c3e50; font-size: 16px;">📉 Real-Time Carbon Intensity (g/kWh)</h3>
-      
-      <div style="display: flex; gap: 10px; align-items: center;">
-        <button id="prev-month-btn" style="background: #ecf0f1; border: none; padding: 6px 15px; border-radius: 15px; cursor: pointer; font-weight: bold; color: #2c3e50; transition: opacity 0.2s;">← Prev</button>
-        <span id="current-month-label" style="font-weight: bold; color: #04703C; padding: 0 10px; min-width: 120px; text-align: center;">Loading...</span>
-        <button id="next-month-btn" style="background: #ecf0f1; border: none; padding: 6px 15px; border-radius: 15px; cursor: pointer; font-weight: bold; color: #2c3e50; transition: opacity 0.2s;">Next →</button>
+  <!-- CHART SECTION -->
+  <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 mb-8">
+    <div class="flex justify-between items-center mb-6">
+      <h3 class="text-lg font-bold text-slate-800">📉 Real-Time Carbon Intensity (g/kWh)</h3>
+      <div class="flex gap-2 items-center">
+        <button id="prev-month-btn" class="bg-slate-100 hover:bg-slate-200 text-slate-700 px-4 py-1.5 rounded-full text-sm font-bold transition-colors">← Prev</button>
+        <span id="current-month-label" class="font-bold text-emerald-700 px-3 min-w-[120px] text-center">Loading...</span>
+        <button id="next-month-btn" class="bg-slate-100 hover:bg-slate-200 text-slate-700 px-4 py-1.5 rounded-full text-sm font-bold transition-colors">Next →</button>
       </div>
-
     </div>
-    <div style="height: 300px; width: 100%;">
+    <div class="h-72 w-full">
       <canvas id="carbonChart"></canvas>
     </div>
   </div>
 
-  <div style="background: white; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.05);">
-    <table style="width: 100%; border-collapse: collapse; text-align: left;">
-      <thead style="background-color: #f8f9fa; border-bottom: 2px solid #ecf0f1;">
-        <tr>
-          <th style="padding: 18px 25px; color: #7f8c8d; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px;">Time</th>
-          <th style="padding: 18px 25px; color: #7f8c8d; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px;">Winner Region</th>
-          <th style="padding: 18px 25px; color: #7f8c8d; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px;">Grid Intensity (g/kWh)</th>
-          <th style="padding: 18px 25px; color: #7f8c8d; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px;">Carbon Saved</th>
-        </tr>
-      </thead>
-      <tbody>
-        <% @requests.each_with_index do |req, index| %>
-          <% data = req.data %>
-          <tr class="history-row" style="border-bottom: 1px solid #f1f2f6; transition: background 0.2s; <%= 'display: none;' if index >= 10 %>">
-            
-            <td style="padding: 18px 25px; color: #2c3e50; font-weight: 500; font-size: 14px;">
-              <%= data[:timestamp].to_time.strftime("%m/%d/%y %H:%M:%S") %>
-            </td>
-            
-            <td style="padding: 18px 25px; font-weight: 600; color: #34495e;">
-              <%= data[:region] %> 
-            </td>
-
-            <td style="padding: 18px 25px;">
-              <% intensity = data[:carbon_intensity].to_i %>
-              <span style="padding: 6px 12px; border-radius: 20px; font-weight: 700; font-size: 12px; 
-                background: <%= intensity < 200 ? '#eafaf1' : (intensity < 500 ? '#fef9e7' : '#fdedec') %>; 
-                color: <%= intensity < 200 ? '#04703C' : (intensity < 500 ? '#f1c40f' : '#c0392b') %>;">
-                <%= intensity %>g
-              </span>
-            </td>
-            <td style="padding: 18px 25px; color: #04703C; font-weight: 700;">
-              +<%= data[:co2_saved] %>g
-            </td>
-          </tr>
-        <% end %>
-      </tbody>
-    </table>
+  <!-- DECISIONS ACTIVITY FEED -->
+  <div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+    <div class="px-6 py-5 border-b border-slate-100">
+      <h3 class="text-lg font-bold text-slate-800">Recent Routing Decisions</h3>
+    </div>
     
-    <% if @requests.to_a.size > 10 %>
-      <div id="view-more-container" style="display: flex; justify-content: center; gap: 15px; padding: 20px; background-color: #f8f9fa; border-top: 1px solid #ecf0f1;">
-        
-        <button id="view-less-btn" style="background-color: #95a5a6; color: white; border: none; padding: 10px 24px; border-radius: 20px; font-weight: bold; font-size: 14px; cursor: pointer; display: none;">
-          ↑ View Less
-        </button>
+    <div class="overflow-x-auto">
+      <table class="min-w-full divide-y divide-slate-100">
+        <thead class="bg-slate-50">
+          <tr>
+            <th class="px-6 py-4 text-left text-xs font-bold text-slate-400 uppercase tracking-wider">Date</th>
+            <th class="px-6 py-4 text-left text-xs font-bold text-slate-400 uppercase tracking-wider">Action Type</th>
+            <th class="px-6 py-4 text-left text-xs font-bold text-slate-400 uppercase tracking-wider">Target Region</th>
+          </tr>
+        </thead>
+        <tbody class="bg-white divide-y divide-slate-100">
+          <% if @decisions.present? %>
+            <% @decisions.each_with_index do |decision, index| %>
+              <tr class="history-row hover:bg-slate-50 transition-colors" style="<%= 'display: none;' if index >= 10 %>">
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-slate-600 font-medium">
+                  <%= decision[:timestamp].strftime("%b %d, %Y • %H:%M") %>
+                </td>
+                
+                <td class="px-6 py-4 whitespace-nowrap">
+                  <% if decision[:decision_type] == 'shifted' || decision[:decision_type] == 'shift_completed' %>
+                    <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold bg-violet-100 text-violet-700">
+                      <svg class="mr-1.5 h-2 w-2 text-violet-500" fill="currentColor" viewBox="0 0 8 8"><circle cx="4" cy="4" r="3" /></svg> Temporal Shift
+                    </span>
+                  <% elsif decision[:decision_type] == 'ignored' %>
+                    <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold bg-slate-100 text-slate-500">
+                      Ignored Advice
+                    </span>
+                  <% else %>
+                    <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold bg-blue-100 text-blue-700">
+                      <svg class="mr-1.5 h-2 w-2 text-blue-500" fill="currentColor" viewBox="0 0 8 8"><circle cx="4" cy="4" r="3" /></svg> Immediate Route
+                    </span>
+                  <% end %>
+                </td>
+                
+                <td class="px-6 py-4 whitespace-nowrap text-sm font-bold text-slate-800">
+                  <%= decision[:chosen_option] %>
+                </td>
+              </tr>
+            <% end %>
+          <% else %>
+            <tr><td colspan="3" class="px-6 py-10 text-center text-sm text-slate-500">No routing decisions recorded yet.</td></tr>
+          <% end %>
+        </tbody>
+      </table>
+    </div>
 
-        <button id="view-more-btn" style="background-color: #04703C; color: white; border: none; padding: 10px 24px; border-radius: 20px; font-weight: bold; font-size: 14px; cursor: pointer;">
-          View More ↓
-        </button>
-
+    <!-- TABLE PAGINATION BUTTONS -->
+    <% if @decisions.to_a.size > 10 %>
+      <div class="flex justify-center gap-4 p-5 bg-slate-50 border-t border-slate-100">
+        <button id="view-less-btn" class="hidden bg-slate-400 hover:bg-slate-500 text-white px-6 py-2 rounded-full font-bold text-sm transition-colors">↑ View Less</button>
+        <button id="view-more-btn" class="bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-2 rounded-full font-bold text-sm transition-colors">View More ↓</button>
       </div>
-    <% end %>      
+    <% end %>
   </div>
 </div>
 
+<!-- ================= JAVASCRIPT LOGIC ================= -->
+
 <script>
-  // --- CHART LOGIC WITH MONTHLY PAGINATION ---
+  // --- CHART LOGIC ---
   const allChartData = <%= raw chart_data.to_json %>;
   const uniqueMonths = [...new Set(allChartData.map(d => d.month_key))];
   let currentMonthIndex = uniqueMonths.length - 1; 
@@ -138,21 +160,16 @@
               borderWidth: 3,
               pointBackgroundColor: '#fff',
               pointBorderColor: '#04703C',
-              pointRadius: 5,
-              pointHoverRadius: 7,
+              pointRadius: 4,
               fill: true,
               tension: 0.4 
           }]
       },
       options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          plugins: { 
-            legend: { display: false },
-            tooltip: { backgroundColor: '#2c3e50', padding: 12, cornerRadius: 8, displayColors: false }
-          },
+          responsive: true, maintainAspectRatio: false,
+          plugins: { legend: { display: false } },
           scales: {
-              y: { beginAtZero: true, grid: { color: '#f0f0f0', borderDash: [5, 5] } },
+              y: { beginAtZero: true, grid: { color: '#f1f5f9', borderDash: [5, 5] } },
               x: { grid: { display: false } }
           }
       }
@@ -163,126 +180,65 @@
       document.getElementById('current-month-label').innerText = "No Data";
       return;
     }
-    
     const targetMonth = uniqueMonths[index];
     document.getElementById('current-month-label').innerText = targetMonth;
-    
     const filteredData = allChartData.filter(d => d.month_key === targetMonth);
     
     carbonChart.data.labels = filteredData.map(d => d.label);
     carbonChart.data.datasets[0].data = filteredData.map(d => d.value);
     carbonChart.update();
-
-    const prevBtn = document.getElementById('prev-month-btn');
-    const nextBtn = document.getElementById('next-month-btn');
-    
-    prevBtn.disabled = (index === 0);
-    prevBtn.style.opacity = (index === 0) ? '0.3' : '1';
-    prevBtn.style.cursor = (index === 0) ? 'default' : 'pointer';
-
-    nextBtn.disabled = (index === uniqueMonths.length - 1);
-    nextBtn.style.opacity = (index === uniqueMonths.length - 1) ? '0.3' : '1';
-    nextBtn.style.cursor = (index === uniqueMonths.length - 1) ? 'default' : 'pointer';
   }
-
   renderChartForMonth(currentMonthIndex);
 
   document.getElementById('prev-month-btn')?.addEventListener('click', () => {
     if (currentMonthIndex > 0) renderChartForMonth(--currentMonthIndex);
   });
-  
   document.getElementById('next-month-btn')?.addEventListener('click', () => {
     if (currentMonthIndex < uniqueMonths.length - 1) renderChartForMonth(++currentMonthIndex);
   });
-</script>
 
-<script>
+  // --- FUN FACT ROTATOR ---
+  const factElement = document.getElementById("fun-fact-text");
+  const totalGrams = <%= @total_saved || 0 %>;
+  const facts = [
+    `Equivalent to charging <strong>${Math.floor(totalGrams / 5.0)}</strong> smartphones 📱`,
+    `Equivalent to a mature tree absorbing carbon for <strong>${(totalGrams / 60.0).toFixed(1)}</strong> days 🌳`,
+    `Offset the production of <strong>${Math.floor(totalGrams / 33.0)}</strong> plastic bags 🛍️`,
+    `Saved the emissions of driving a gas car <strong>${(totalGrams / 400.0).toFixed(2)}</strong> miles 🚗`
+  ];
+  let currentIndex = 0;
+  setInterval(() => {
+    factElement.style.opacity = 0;
+    setTimeout(() => {
+      currentIndex = (currentIndex + 1) % facts.length;
+      factElement.innerHTML = facts[currentIndex];
+      factElement.style.opacity = 1;
+    }, 500);
+  }, 30000); 
+
   // --- TABLE PAGINATION LOGIC ---
-  document.addEventListener("DOMContentLoaded", function() {
-      let visibleCount = 10;
-      const rows = document.querySelectorAll('.history-row');
-      const totalRows = rows.length;
-      
-      const viewMoreBtn = document.getElementById('view-more-btn');
-      const viewLessBtn = document.getElementById('view-less-btn');
+  let visibleCount = 10;
+  const rows = document.querySelectorAll('.history-row');
+  const viewMoreBtn = document.getElementById('view-more-btn');
+  const viewLessBtn = document.getElementById('view-less-btn');
 
-      function updateButtons() {
-        if (!viewMoreBtn || !viewLessBtn) return;
-        viewMoreBtn.style.display = (visibleCount >= totalRows) ? 'none' : 'inline-block';
-        viewLessBtn.style.display = (visibleCount <= 10) ? 'none' : 'inline-block';
-      }
+  function updateButtons() {
+    if (!viewMoreBtn || !viewLessBtn) return;
+    viewMoreBtn.style.display = (visibleCount >= rows.length) ? 'none' : 'inline-block';
+    viewLessBtn.classList.toggle('hidden', visibleCount <= 10);
+  }
 
-      if (viewMoreBtn) {
-        viewMoreBtn.addEventListener('click', function() {
-          let nextCount = Math.min(visibleCount + 10, totalRows);
-          
-          for (let i = visibleCount; i < nextCount; i++) {
-            rows[i].style.display = 'table-row';
-          }
-          visibleCount = nextCount;
-          updateButtons();
-        });
-      }
-
-      if (viewLessBtn) {
-        viewLessBtn.addEventListener('click', function() {
-          let remainder = visibleCount % 10;
-          let nextCount;
-
-          if (remainder !== 0) {
-            nextCount = visibleCount - remainder; 
-          } else {
-            nextCount = visibleCount - 10;
-          }
-
-          if (nextCount < 10) nextCount = 10; 
-
-          for (let i = nextCount; i < visibleCount; i++) {
-            rows[i].style.display = 'none';
-          }
-          
-          visibleCount = nextCount;
-          updateButtons();
-        });
-      }
-      
-      updateButtons();
+  viewMoreBtn?.addEventListener('click', () => {
+    let nextCount = Math.min(visibleCount + 10, rows.length);
+    for (let i = visibleCount; i < nextCount; i++) rows[i].style.display = 'table-row';
+    visibleCount = nextCount;
+    updateButtons();
   });
-</script>
 
-<script>
-  // --- NEW: FUN FACT ROTATOR ---
-  document.addEventListener("DOMContentLoaded", function() {
-    const factElement = document.getElementById("fun-fact-text");
-    const totalGrams = <%= @total_saved || 0 %>;
-
-    // The math behind the stats:
-    // 1 Smartphone = ~5g CO2
-    // 1 Mature tree = ~60g CO2 absorbed per day
-    // 1 Average car = ~400g CO2 per mile
-    // 1 Plastic bag = ~33g CO2 to produce
-    const facts = [
-      `Equivalent to charging <strong>${Math.floor(totalGrams / 5.0)}</strong> smartphones 📱`,
-      `Equivalent to a mature tree absorbing carbon for <strong>${(totalGrams / 60.0).toFixed(1)}</strong> days 🌳`,
-      `Offset the production of <strong>${Math.floor(totalGrams / 33.0)}</strong> plastic bags 🛍️`,
-      `Saved the emissions of driving a gas car <strong>${(totalGrams / 400.0).toFixed(2)}</strong> miles 🚗`
-    ];
-
-    let currentIndex = 0;
-
-    // Run this block every 30 seconds (30000ms)
-    setInterval(() => {
-      // 1. Fade out
-      factElement.style.opacity = 0;
-      
-      // 2. Wait 500ms for the fade to finish, then swap the text and fade back in
-      setTimeout(() => {
-        currentIndex = (currentIndex + 1) % facts.length;
-        // THE FIX: Changed currentFactIndex to currentIndex
-        factElement.innerHTML = facts[currentIndex];
-        factElement.style.opacity = 1;
-      }, 500);
-
-    }, 30000); 
+  viewLessBtn?.addEventListener('click', () => {
+    let nextCount = Math.max(10, visibleCount - (visibleCount % 10 === 0 ? 10 : visibleCount % 10));
+    for (let i = nextCount; i < visibleCount; i++) rows[i].style.display = 'none';
+    visibleCount = nextCount;
+    updateButtons();
   });
 </script>

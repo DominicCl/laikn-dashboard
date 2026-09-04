@@ -2,41 +2,54 @@ require "google/cloud/firestore"
 
 class DashboardController < ApplicationController
   def index
-    # 1. Connect
+    # Grab the user ID from the URL (passed by the VS Code extension)
+    @user_id = params[:user]
+    
+    # If no user is provided, default to an empty state
+    if @user_id.blank?
+      @total_saved = 0
+      @immediate_count = 0
+      @shifted_count = 0
+      @decisions = []
+      return
+    end
+
+    # Initialize Firestore
     firestore = Google::Cloud::Firestore.new(project_id: "loyal-theater-484704-g3")
-    
-    # Extract the user ID from the URL (e.g., ?user=12345)
-    target_user_id = params[:user]
 
-    if target_user_id.present?
-      # 2. Fetch History (Filtered by user_id, newest first)
-      @requests = firestore.col("history")
-                           .where("user_id", "=", target_user_id)
-                           .order("timestamp", :desc)
-                           .limit(50)
-                           .get
-    else
-      # If no user ID is provided, return an empty array to protect data
-      @requests = []
-    end
-    
-    # 3. Calculate Total Savings (Only for this specific user)
-    @total_saved = 0
-    @requests.each do |doc|
-      val = doc.data[:co2_saved]
-      @total_saved += val.to_i if val 
-    end
+    # 1. Calculate Total CO2 Saved (from the 'history' collection)
+    history_docs = firestore.col("history").where("user_id", "=", @user_id).get
+    @requests = history_docs
+    @total_saved = history_docs.sum { |doc| doc.data[:co2_saved].to_i }
 
-    # 4. Prepare Chart Data
-    chart_data = @requests.to_a.reverse.map do |doc|
+    # 2. Process User Decisions (from the 'decisions' collection)
+    # Ordering by timestamp descending puts the newest actions at the top of the feed
+    decision_docs = firestore.col("decisions")
+                             .where("user_id", "=", @user_id)
+                             .order("timestamp", :desc)
+                             .get
+
+    @immediate_count = 0
+    @shifted_count = 0
+    @decisions = []
+
+    decision_docs.each do |doc|
       data = doc.data
-      {
-        time: data[:timestamp].to_time.strftime("%H:%M"), 
-        score: data[:carbon_intensity]
+      type = data[:decision] # 'immediate', 'shifted', 'shift_completed', or 'ignored'
+      
+      # Tally the metrics
+      if type == 'immediate'
+        @immediate_count += 1
+      elsif type == 'shifted' || type == 'shift_completed'
+        @shifted_count += 1
+      end
+      
+      # Build the array for the Activity Feed table
+      @decisions << {
+        timestamp: data[:timestamp] || Time.now,
+        decision_type: type,
+        chosen_option: data[:chosen_option]
       }
     end
-
-    @labels_json = chart_data.map { |d| d[:time] }.to_json
-    @values_json = chart_data.map { |d| d[:score] }.to_json
   end
 end
