@@ -1,12 +1,11 @@
 <% 
-  # Chart Data Builder (Sorted chronologically: Oldest -> Newest)
+  # Chart Data Builder (Pass raw UTC to JavaScript to handle local timezones)
   chart_data = []
   if @requests.present?
     sorted_history = @requests.to_a.sort_by { |req| req.data[:timestamp].to_time }
     
     chart_data = sorted_history.map do |req|
-      time = req.data[:timestamp].to_time
-      { month_key: time.strftime("%B %Y"), label: time.strftime("%m/%d %H:%M"), value: req.data[:carbon_intensity].to_i }
+      { raw_utc: req.data[:timestamp].to_time.iso8601, value: req.data[:carbon_intensity].to_i }
     end
   end
 %>
@@ -99,8 +98,11 @@
           <% if @decisions.present? %>
             <% @decisions.each_with_index do |decision, index| %>
               <tr class="history-row hover:bg-slate-50 transition-colors" style="<%= 'display: none;' if index >= 10 %>">
+                <!-- Using a data attribute so JavaScript can inject the user's local time -->
                 <td class="px-6 py-4 whitespace-nowrap text-sm text-slate-600 font-medium">
-                  <%= decision[:timestamp].strftime("%b %d, %Y • %H:%M") %>
+                  <span class="local-timestamp" data-utc="<%= decision[:timestamp].to_time.iso8601 %>">
+                    Loading...
+                  </span>
                 </td>
                 
                 <td class="px-6 py-4 whitespace-nowrap">
@@ -144,8 +146,36 @@
 <!-- ================= JAVASCRIPT LOGIC ================= -->
 
 <script>
+  // --- TIMEZONE FORMATTER ---
+  // Grabs all the UTC timestamps from the table and converts them to the browser's local timezone
+  document.querySelectorAll('.local-timestamp').forEach(el => {
+    const rawDate = el.getAttribute('data-utc');
+    if (rawDate) {
+      const date = new Date(rawDate);
+      const options = { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false };
+      el.innerText = date.toLocaleString('en-US', options).replace(',', ' •');
+    }
+  });
+
   // --- CHART LOGIC ---
-  const allChartData = <%= raw chart_data.to_json %>;
+  const rawData = <%= raw chart_data.to_json %>;
+  
+  // Convert UTC to local time for the chart labels
+  const allChartData = rawData.map(d => {
+    const date = new Date(d.raw_utc);
+    const monthStr = date.toLocaleString('en-US', { month: 'long', year: 'numeric' });
+    const mm = String(date.getMonth() + 1).padStart(2, '0');
+    const dd = String(date.getDate()).padStart(2, '0');
+    const hh = String(date.getHours()).padStart(2, '0');
+    const min = String(date.getMinutes()).padStart(2, '0');
+    
+    return {
+      month_key: monthStr,
+      label: `${mm}/${dd} ${hh}:${min}`,
+      value: d.value
+    };
+  });
+
   const uniqueMonths = [...new Set(allChartData.map(d => d.month_key))];
   let currentMonthIndex = uniqueMonths.length - 1; 
   
