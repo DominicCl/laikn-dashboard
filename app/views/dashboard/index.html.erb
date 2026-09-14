@@ -28,17 +28,13 @@
   <!-- HERO STATS ROW -->
   <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
     
-    <!-- Total CO2 Saved & Fun Fact -->
+    <!-- Routing analyses -->
     <div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-6 flex flex-col justify-center">
-      <h3 class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">Total Carbon Saved</h3>
+      <h3 class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">Routing Analyses</h3>
       <div class="text-5xl font-extrabold text-emerald-700 leading-none mb-3">
-        <%= @total_saved || 0 %>g
+        <%= @analysis_count || 0 %>
       </div>
-      <div class="h-5">
-        <p id="fun-fact-text" class="text-sm text-slate-500 transition-opacity duration-500 opacity-100">
-          Equivalent to charging <strong><%= ((@total_saved || 0) / 5.0).to_i %></strong> smartphones 📱
-        </p>
-      </div>
+      <p class="text-sm text-slate-500">Region comparisons requested from the extension.</p>
     </div>
 
     <!-- Immediate Routes -->
@@ -226,25 +222,6 @@
   document.getElementById('next-month-btn')?.addEventListener('click', () => {
     if (currentMonthIndex < uniqueMonths.length - 1) renderChartForMonth(++currentMonthIndex);
   });
-
-  // --- FUN FACT ROTATOR ---
-  const factElement = document.getElementById("fun-fact-text");
-  const totalGrams = <%= @total_saved || 0 %>;
-  const facts = [
-    `Equivalent to charging <strong>${Math.floor(totalGrams / 5.0)}</strong> smartphones 📱`,
-    `Equivalent to a mature tree absorbing carbon for <strong>${(totalGrams / 60.0).toFixed(1)}</strong> days 🌳`,
-    `Offset the production of <strong>${Math.floor(totalGrams / 33.0)}</strong> plastic bags 🛍️`,
-    `Saved the emissions of driving a gas car <strong>${(totalGrams / 400.0).toFixed(2)}</strong> miles 🚗`
-  ];
-  let currentIndex = 0;
-  setInterval(() => {
-    factElement.style.opacity = 0;
-    setTimeout(() => {
-      currentIndex = (currentIndex + 1) % facts.length;
-      factElement.innerHTML = facts[currentIndex];
-      factElement.style.opacity = 1;
-    }, 500);
-  }, 30000); 
 
   // --- TABLE PAGINATION LOGIC ---
   let visibleCount = 10;
